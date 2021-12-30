@@ -39,16 +39,22 @@ compile_atf()
 
 	display_alert "Compiling ATF" "" "info"
 
-	local toolchain
-	toolchain=$(find_toolchain "$ATF_COMPILER" "$ATF_USE_GCC")
-	[[ -z $toolchain ]] && exit_with_error "Could not find required toolchain" "${ATF_COMPILER}gcc $ATF_USE_GCC"
+	# build aarch64
+	if [[ $(dpkg --print-architecture) == amd64 ]]; then
 
-	if [[ -n $ATF_TOOLCHAIN2 ]]; then
-		local toolchain2_type toolchain2_ver toolchain2
-		toolchain2_type=$(cut -d':' -f1 <<< "${ATF_TOOLCHAIN2}")
-		toolchain2_ver=$(cut -d':' -f2 <<< "${ATF_TOOLCHAIN2}")
-		toolchain2=$(find_toolchain "$toolchain2_type" "$toolchain2_ver")
-		[[ -z $toolchain2 ]] && exit_with_error "Could not find required toolchain" "${toolchain2_type}gcc $toolchain2_ver"
+		local toolchain
+		toolchain=$(find_toolchain "$ATF_COMPILER" "$ATF_USE_GCC")
+		[[ -z $toolchain ]] && exit_with_error "Could not find required toolchain" "${ATF_COMPILER}gcc $ATF_USE_GCC"
+
+		if [[ -n $ATF_TOOLCHAIN2 ]]; then
+			local toolchain2_type toolchain2_ver toolchain2
+			toolchain2_type=$(cut -d':' -f1 <<< "${ATF_TOOLCHAIN2}")
+			toolchain2_ver=$(cut -d':' -f2 <<< "${ATF_TOOLCHAIN2}")
+			toolchain2=$(find_toolchain "$toolchain2_type" "$toolchain2_ver")
+			[[ -z $toolchain2 ]] && exit_with_error "Could not find required toolchain" "${toolchain2_type}gcc $toolchain2_ver"
+		fi
+
+	# build aarch64
 	fi
 
 	display_alert "Compiler version" "${ATF_COMPILER}gcc $(eval env PATH="${toolchain}:${PATH}" "${ATF_COMPILER}gcc" -dumpversion)" "info"
@@ -125,16 +131,22 @@ compile_uboot()
 
 	display_alert "Compiling u-boot" "v$version" "info"
 
-	local toolchain
-	toolchain=$(find_toolchain "$UBOOT_COMPILER" "$UBOOT_USE_GCC")
-	[[ -z $toolchain ]] && exit_with_error "Could not find required toolchain" "${UBOOT_COMPILER}gcc $UBOOT_USE_GCC"
+	# build aarch64
+	if [[ $(dpkg --print-architecture) == amd64 ]]; then
 
-	if [[ -n $UBOOT_TOOLCHAIN2 ]]; then
-		local toolchain2_type toolchain2_ver toolchain2
-		toolchain2_type=$(cut -d':' -f1 <<< "${UBOOT_TOOLCHAIN2}")
-		toolchain2_ver=$(cut -d':' -f2 <<< "${UBOOT_TOOLCHAIN2}")
-		toolchain2=$(find_toolchain "$toolchain2_type" "$toolchain2_ver")
-		[[ -z $toolchain2 ]] && exit_with_error "Could not find required toolchain" "${toolchain2_type}gcc $toolchain2_ver"
+		local toolchain
+		toolchain=$(find_toolchain "$UBOOT_COMPILER" "$UBOOT_USE_GCC")
+		[[ -z $toolchain ]] && exit_with_error "Could not find required toolchain" "${UBOOT_COMPILER}gcc $UBOOT_USE_GCC"
+
+		if [[ -n $UBOOT_TOOLCHAIN2 ]]; then
+			local toolchain2_type toolchain2_ver toolchain2
+			toolchain2_type=$(cut -d':' -f1 <<< "${UBOOT_TOOLCHAIN2}")
+			toolchain2_ver=$(cut -d':' -f2 <<< "${UBOOT_TOOLCHAIN2}")
+			toolchain2=$(find_toolchain "$toolchain2_type" "$toolchain2_ver")
+			[[ -z $toolchain2 ]] && exit_with_error "Could not find required toolchain" "${toolchain2_type}gcc $toolchain2_ver"
+		fi
+
+	# build aarch64
 	fi
 
 	display_alert "Compiler version" "${UBOOT_COMPILER}gcc $(eval env PATH="${toolchain}:${toolchain2}:${PATH}" "${UBOOT_COMPILER}gcc" -dumpversion)" "info"

@@ -650,12 +650,17 @@ prepare_host()
 	else
 		local offline=false
 	fi
+	# build aarch64
+  	if [[ $(dpkg --print-architecture) != arm64 ]]; then
 
-	if [[ $(dpkg --print-architecture) != amd64 ]]; then
-		display_alert "Please read documentation to set up proper compilation environment"
-		display_alert "http://www.orangepi.org"
-		exit_with_error "Running this tool on non x86-x64 build host in not supported"
-	fi
+		if [[ $(dpkg --print-architecture) != amd64 ]]; then
+			display_alert "Please read documentation to set up proper compilation environment"
+			display_alert "http://www.orangepi.org"
+			exit_with_error "Running this tool on non x86-x64 build host in not supported"
+		fi
+		
+	# build aarch64
+  	fi
 
 	# wait until package manager finishes possible system maintanace
 	wait_for_package_manager
@@ -665,13 +670,34 @@ prepare_host()
 
 	# packages list for host
 	# NOTE: please sync any changes here with the Dockerfile and Vagrantfile
-	local hostdeps="wget ca-certificates device-tree-compiler pv bc lzop zip binfmt-support build-essential ccache debootstrap ntpdate \
-	gawk gcc-arm-linux-gnueabihf qemu-user-static u-boot-tools uuid-dev zlib1g-dev unzip libusb-1.0-0-dev fakeroot \
-	parted pkg-config libncurses5-dev whiptail debian-keyring debian-archive-keyring f2fs-tools libfile-fcntllock-perl rsync libssl-dev \
-	nfs-kernel-server btrfs-progs ncurses-term p7zip-full kmod dosfstools libc6-dev-armhf-cross imagemagick \
-	curl patchutils liblz4-tool libpython2.7-dev linux-base swig acl python3-dev python3-distutils libfdt-dev \
-	locales ncurses-base pixz dialog systemd-container udev lib32stdc++6 libc6-i386 lib32ncurses5 lib32tinfo5 \
-	bison libbison-dev flex libfl-dev cryptsetup gpg gnupg1 gpgv1 gpgv2 cpio aria2 pigz dirmngr python3-distutils distcc git dos2unix"
+
+	# build aarch64
+  	if [[ $(dpkg --print-architecture) == amd64 ]]; then
+
+		local hostdeps="wget ca-certificates device-tree-compiler pv bc lzop zip binfmt-support build-essential ccache debootstrap ntpdate \
+		gawk gcc-arm-linux-gnueabihf qemu-user-static u-boot-tools uuid-dev zlib1g-dev unzip libusb-1.0-0-dev fakeroot \
+		parted pkg-config libncurses5-dev whiptail debian-keyring debian-archive-keyring f2fs-tools libfile-fcntllock-perl rsync libssl-dev \
+		nfs-kernel-server btrfs-progs ncurses-term p7zip-full kmod dosfstools libc6-dev-armhf-cross imagemagick \
+		curl patchutils liblz4-tool libpython2.7-dev linux-base swig acl python3-dev python3-distutils libfdt-dev \
+		locales ncurses-base pixz dialog systemd-container udev lib32stdc++6 libc6-i386 lib32ncurses5 lib32tinfo5 \
+		bison libbison-dev flex libfl-dev cryptsetup gpg gnupg1 gpgv1 gpgv2 cpio aria2 pigz dirmngr distcc git dos2unix"
+	
+	# build aarch64
+  	else
+
+		local hostdeps="wget ca-certificates device-tree-compiler pv bc lzop zip binfmt-support build-essential ccache debootstrap ntpdate \
+		gawk gcc-arm-linux-gnueabihf gcc-arm-linux-gnueabi gcc-arm-none-eabi \
+		qemu-user-static u-boot-tools uuid-dev zlib1g-dev unzip libusb-1.0-0-dev fakeroot \
+		parted pkg-config libncurses5-dev whiptail debian-keyring debian-archive-keyring f2fs-tools libfile-fcntllock-perl rsync libssl-dev \
+		nfs-kernel-server btrfs-progs ncurses-term p7zip-full kmod dosfstools libc6-amd64-cross libc6-dev-armhf-cross imagemagick \
+		curl patchutils liblz4-tool libpython2.7-dev linux-base swig aptly acl python3-dev python3-distutils libfdt-dev\
+		locales ncurses-base pixz dialog systemd-container udev libelf-dev libc6 qemu \
+		bison libbison-dev flex libfl-dev cryptsetup gpg gnupg1 cpio aria2 pigz \
+		dirmngr jq gdisk dwarves distcc git dos2unix"
+
+	# build aarch64
+	fi
+
 
 	local codename=$(lsb_release -sc)
 
@@ -702,14 +728,21 @@ prepare_host()
 	fi
 
 	if grep -qE "(Microsoft|WSL)" /proc/version; then
-		exit_with_error "Windows subsystem for Linux is not a supported build environment"
+		display_alert "Windows subsystem for Linux is not a supported build environment" "" "wrn"
 	fi
 
-	if [[ -z $codename || "focal" == "$codename" || "eoan" == "$codename"  || "debbie" == "$codename"  || "buster" == "$codename" || "ulyana" == "$codename" ]]; then
-	    hostdeps="${hostdeps/lib32ncurses5 lib32tinfo5/lib32ncurses6 lib32tinfo6}"
-	fi
+	# build aarch64
+	if [[ $(dpkg --print-architecture) == amd64 ]]; then
 
-	grep -q i386 <(dpkg --print-foreign-architectures) || dpkg --add-architecture i386
+		if [[ -z $codename || "focal" == "$codename" || "eoan" == "$codename"  || "debbie" == "$codename"  || "buster" == "$codename" || "ulyana" == "$codename" ]]; then
+			hostdeps="${hostdeps/lib32ncurses5 lib32tinfo5/lib32ncurses6 lib32tinfo6}"
+		fi
+
+		grep -q i386 <(dpkg --print-foreign-architectures) || dpkg --add-architecture i386
+
+	# build aarch64
+  	fi
+
 	if systemd-detect-virt -q -c; then
 		display_alert "Running in container" "$(systemd-detect-virt)" "info"
 		# disable apt-cacher unless NO_APT_CACHER=no is not specified explicitly
@@ -741,25 +774,32 @@ prepare_host()
 	done
 
 	# distribution packages are buggy, download from author
-	if [[ ! -f /etc/apt/sources.list.d/aptly.list ]]; then
-		display_alert "Updating from external repository" "aptly" "info"
-		if [ x"" != x"${http_proxy}" ]; then
-			apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --keyserver-options http-proxy="${http_proxy}" --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
-			apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --keyserver-options http-proxy="${http_proxy}" --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
-		else
-			apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
-			apt-key adv --keyserver pool.sks-keyservers.net --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
-		fi
-		echo "deb http://repo.aptly.info/ nightly main" > /etc/apt/sources.list.d/aptly.list
-	else
-		sed "s/squeeze/nightly/" -i /etc/apt/sources.list.d/aptly.list
-	fi
+	
+	# build aarch64
+	if [[ $(dpkg --print-architecture) == amd64 ]]; then
 
-	local aptly_ver=$(dpkg -s aptly | grep '^Version:' | cut -d " " -f 2)
-	if [[ $aptly_ver != "1.4.0+44+g24a0271" ]]; then 
-		apt-get -q -y purge aptly 2>&1 >/dev/null
-		dpkg -i ${EXTER}/cache/debs/aptly/aptly_1.4.0+44+g24a0271_amd64.deb 2>&1 >/dev/null
-	fi
+		if [[ ! -f /etc/apt/sources.list.d/aptly.list ]]; then
+			display_alert "Updating from external repository" "aptly" "info"
+			if [ x"" != x"${http_proxy}" ]; then
+				apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --keyserver-options http-proxy="${http_proxy}" --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
+				apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --keyserver-options http-proxy="${http_proxy}" --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
+			else
+				apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
+				apt-key adv --keyserver pool.sks-keyservers.net --recv-keys ED75B5A4483DA07C >/dev/null 2>&1
+			fi
+			echo "deb http://repo.aptly.info/ nightly main" > /etc/apt/sources.list.d/aptly.list
+		else
+			sed "s/squeeze/nightly/" -i /etc/apt/sources.list.d/aptly.list
+		fi
+
+		local aptly_ver=$(dpkg -s aptly | grep '^Version:' | cut -d " " -f 2)
+		if [[ $aptly_ver != "1.4.0+44+g24a0271" ]]; then 
+			apt-get -q -y purge aptly 2>&1 >/dev/null
+			dpkg -i ${EXTER}/cache/debs/aptly/aptly_1.4.0+44+g24a0271_amd64.deb 2>&1 >/dev/null
+		fi
+
+	# build aarch64
+  	fi
 
 	if [[ ${#deps[@]} -gt 0 ]]; then
 		display_alert "Installing build dependencies"
@@ -775,8 +815,14 @@ prepare_host()
 		ntpdate -s "${NTP_SERVER:-pool.ntp.org}"
 	fi
 
-	if [[ $(dpkg-query -W -f='${db:Status-Abbrev}\n' 'zlib1g:i386' 2>/dev/null) != *ii* ]]; then
-		apt-get install -qq -y --no-install-recommends zlib1g:i386 >/dev/null 2>&1
+	# build aarch64
+	if [[ $(dpkg --print-architecture) == amd64 ]]; then
+
+		if [[ $(dpkg-query -W -f='${db:Status-Abbrev}\n' 'zlib1g:i386' 2>/dev/null) != *ii* ]]; then
+			apt-get install -qq -y --no-install-recommends zlib1g:i386 >/dev/null 2>&1
+		fi
+
+	# build aarch64
 	fi
 
 	# create directory structure
@@ -791,56 +837,62 @@ prepare_host()
 	fi
 	mkdir -p $DEST/debs/{extra,u-boot}  $DEST/{config,debug,patch,images} $USERPATCHES_PATH/overlay $EXTER/cache/{debs,sources,hash} $SRC/toolchains  $SRC/.tmp
 
-	display_alert "Checking for external GCC compilers" "" "info"
-	# download external Linaro compiler and missing special dependencies since they are needed for certain sources
+	# build aarch64
+	if [[ $(dpkg --print-architecture) == amd64 ]]; then
 
-	local toolchains=(
-		"gcc-linaro-aarch64-none-elf-4.8-2013.11_linux.tar.xz"
-		"gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
-		"gcc-linaro-arm-linux-gnueabihf-4.8-2014.04_linux.tar.xz"
-		"gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabi.tar.xz"
-		"gcc-linaro-4.9.4-2017.01-x86_64_aarch64-linux-gnu.tar.xz"
-		"gcc-linaro-5.5.0-2017.10-x86_64_arm-linux-gnueabihf.tar.xz"
-		"gcc-linaro-7.4.1-2019.02-x86_64_arm-linux-gnueabi.tar.xz"
-		"gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu.tar.xz"
-		"gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf.tar.xz"
-		"gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz"
-		)
+		display_alert "Checking for external GCC compilers" "" "info"
+		# download external Linaro compiler and missing special dependencies since they are needed for certain sources
 
-	USE_TORRENT_STATUS=${USE_TORRENT}
-	USE_TORRENT="no"
-	for toolchain in ${toolchains[@]}; do
-		download_and_verify "_toolchain" "${toolchain##*/}"
-	done
-	USE_TORRENT=${USE_TORRENT_STATUS}
+		local toolchains=(
+			"gcc-linaro-aarch64-none-elf-4.8-2013.11_linux.tar.xz"
+			"gcc-linaro-arm-none-eabi-4.8-2014.04_linux.tar.xz"
+			"gcc-linaro-arm-linux-gnueabihf-4.8-2014.04_linux.tar.xz"
+			"gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabi.tar.xz"
+			"gcc-linaro-4.9.4-2017.01-x86_64_aarch64-linux-gnu.tar.xz"
+			"gcc-linaro-5.5.0-2017.10-x86_64_arm-linux-gnueabihf.tar.xz"
+			"gcc-linaro-7.4.1-2019.02-x86_64_arm-linux-gnueabi.tar.xz"
+			"gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu.tar.xz"
+			"gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf.tar.xz"
+			"gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz"
+			)
 
-	rm -rf $SRC/toolchains/*.tar.xz*
-	local existing_dirs=( $(ls -1 $SRC/toolchains) )
-	for dir in ${existing_dirs[@]}; do
-		local found=no
+		USE_TORRENT_STATUS=${USE_TORRENT}
+		USE_TORRENT="no"
 		for toolchain in ${toolchains[@]}; do
-			local filename=${toolchain##*/}
-			local dirname=${filename//.tar.xz}
-			[[ $dir == $dirname ]] && found=yes
+			download_and_verify "_toolchain" "${toolchain##*/}"
 		done
-		if [[ $found == no ]]; then
-			display_alert "Removing obsolete toolchain" "$dir"
-			rm -rf $SRC/toolchains/$dir
-		fi
-	done
+		USE_TORRENT=${USE_TORRENT_STATUS}
 
-	fi # check offline
+		rm -rf $SRC/toolchains/*.tar.xz*
+		local existing_dirs=( $(ls -1 $SRC/toolchains) )
+		for dir in ${existing_dirs[@]}; do
+			local found=no
+			for toolchain in ${toolchains[@]}; do
+				local filename=${toolchain##*/}
+				local dirname=${filename//.tar.xz}
+				[[ $dir == $dirname ]] && found=yes
+			done
+			if [[ $found == no ]]; then
+				display_alert "Removing obsolete toolchain" "$dir"
+				rm -rf $SRC/toolchains/$dir
+			fi
+		done
 
-	# enable arm binary format so that the cross-architecture chroot environment will work
-	if [[ $BUILD_OPT == "image" || $BUILD_OPT == "rootfs" ]]; then
-		modprobe -q binfmt_misc
-		mountpoint -q /proc/sys/fs/binfmt_misc/ || mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-		if [[ ! -f /proc/sys/fs/binfmt_misc/qemu-arm ]]; then
-			apt-get -q -y purge qemu-user-static
-			apt-get -q -y install qemu-user-static
+		fi # check offline
+
+		# enable arm binary format so that the cross-architecture chroot environment will work
+		if [[ $BUILD_OPT == "image" || $BUILD_OPT == "rootfs" ]]; then
+			modprobe -q binfmt_misc
+			mountpoint -q /proc/sys/fs/binfmt_misc/ || mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+			if [[ ! -f /proc/sys/fs/binfmt_misc/qemu-arm ]]; then
+				apt-get -q -y purge qemu-user-static
+				apt-get -q -y install qemu-user-static
+			fi
+			test -e /proc/sys/fs/binfmt_misc/qemu-arm || update-binfmts --enable qemu-arm
+			test -e /proc/sys/fs/binfmt_misc/qemu-aarch64 || update-binfmts --enable qemu-aarch64
 		fi
-		test -e /proc/sys/fs/binfmt_misc/qemu-arm || update-binfmts --enable qemu-arm
-		test -e /proc/sys/fs/binfmt_misc/qemu-aarch64 || update-binfmts --enable qemu-aarch64
+
+	# build aarch64
 	fi
 
 	[[ ! -f $USERPATCHES_PATH/customize-image.sh ]] && cp $EXTER/config/templates/customize-image.sh.template $USERPATCHES_PATH/customize-image.sh
